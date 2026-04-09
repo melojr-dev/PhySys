@@ -181,10 +181,13 @@ class AnalisadorADMWeb:
                 cv2.putText(img_rgb, status, (35, 53), cv2.FONT_HERSHEY_DUPLEX, 0.7, (255, 255, 255), 2)
                 cv2.putText(img_rgb, f"{int(val_ang)} deg", (d_b[0]-40, d_b[1]+45), cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 255, 255), 2)
             
+            # --- SALVAMENTO NA MEMÓRIA ---
+            # Sempre reduz o frame (achando a pessoa ou não) e salva, para evitar OOM no Streamlit
             frame_reduzido = cv2.resize(img_rgb, (640, 480))
             frames.append(frame_reduzido)
             angulos.append(val_ang)
             velocidades.append(vel_ang)
+            
             if progress_callback: 
                 progress_callback(min(len(frames) / total_f, 1.0))
 
