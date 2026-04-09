@@ -6,3 +6,10 @@ pandas
 matplotlib
 python-dotenv
 torch
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+streamlit
+mediapipe==0.10.14
+opencv-python-headless
+numpy<2.0.0
+pandas
