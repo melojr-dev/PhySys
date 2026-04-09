@@ -1,20 +1,13 @@
-import os
-try:
-    import cv2
-except ImportError as e:
-    if "libGL" in str(e):
-        print("Instalando dependências headless...")
-        os.system("pip uninstall -y opencv-python opencv-contrib-python")
-        os.system("pip install opencv-python-headless opencv-contrib-python-headless")
-        import cv2
 import streamlit as st
 import tempfile
 import time
 import pandas as pd
 import numpy as np
 import torch
+import cv2
+import os
+import gc
 from src.core.engine import AnalisadorADMWeb
-
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="PhysioAI - Player Completo", page_icon="🩺", layout="wide")
@@ -88,6 +81,10 @@ if uploaded_file:
     resetar_estado(uploaded_file.name)
     
     if st.sidebar.button("▶️ Processar Vídeo"):
+        # --- FAXINA DE MEMÓRIA (Evita a tela "Oh no" no Streamlit Cloud) ---
+        st.session_state.frames_salvos = []
+        gc.collect() # Força o Linux a liberar RAM imediatamente
+        
         with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tfile:
             tfile.write(uploaded_file.read())
             
@@ -166,13 +163,13 @@ if st.session_state.analise_feita and st.session_state.frames_salvos:
         if st.session_state.playing:
             for i in range(st.session_state.frame_atual, total_frames):
                 if not st.session_state.playing: break
-                image_placeholder.image(st.session_state.frames_salvos[i], channels="RGB", use_container_width=True)
+                image_placeholder.image(st.session_state.frames_salvos[i], channels="RGB", use_column_width=True)
                 st.session_state.frame_atual = i
                 time.sleep(1/st.session_state.fps * 0.8) 
             st.session_state.playing = False
             st.rerun()
         else:
-            image_placeholder.image(st.session_state.frames_salvos[st.session_state.frame_atual], channels="RGB", use_container_width=True)
+            image_placeholder.image(st.session_state.frames_salvos[st.session_state.frame_atual], channels="RGB", use_column_width=True)
 
     with col_stats:
         st.subheader("📊 Relatório Clínico")
