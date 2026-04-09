@@ -1,17 +1,11 @@
-import os
-try:
-    import cv2
-except ImportError:
-    os.system("pip uninstall -y opencv-python opencv-contrib-python")
-    os.system("pip install opencv-python-headless opencv-contrib-python-headless")
-    import cv2
-
 import streamlit as st
 import tempfile
 import time
 import pandas as pd
 import numpy as np
 import torch
+import cv2
+import os
 from src.core.engine import AnalisadorADMWeb
 
 
