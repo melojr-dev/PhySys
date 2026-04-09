@@ -29,14 +29,25 @@ class AnalisadorADMWeb:
             
         self.modelo_ia = None
         
-        # --- MOTOR DE POSE: PRECISÃO MILIMÉTRICA ---
-        # model_complexity=2 é obrigatório para evitar o "salto" de pontos no punho
-        self.pose = mp_pose.Pose(
-            static_image_mode=False, 
-            model_complexity=2, 
-            min_detection_confidence=0.6,
-            min_tracking_confidence=0.6
-        )
+        # --- MOTOR DE POSE: AUTO-ADAPTÁVEL (Nuvem vs Local) ---
+        try:
+            # Tenta usar o modelo Heavy (Nível 2 - Ideal para o seu PC Local em Belém)
+            self.pose = mp_pose.Pose(
+                static_image_mode=False, 
+                model_complexity=2, 
+                min_detection_confidence=0.6,
+                min_tracking_confidence=0.6
+            )
+        except PermissionError:
+            # Fallback automático para a Nuvem (Streamlit Cloud bloqueia downloads na pasta base)
+            # O modelo Full (Nível 1) já vem embutido e resolve o problema
+            self.pose = mp_pose.Pose(
+                static_image_mode=False, 
+                model_complexity=1, 
+                min_detection_confidence=0.6,
+                min_tracking_confidence=0.6
+            )
+            
         self._configurar_nos_anatomicos()
 
     def _configurar_nos_anatomicos(self):
@@ -84,107 +95,4 @@ class AnalisadorADMWeb:
             if self.device.type == 'cuda':
                 self.modelo_ia = self.modelo_ia.half() 
                 try: self.modelo_ia = torch.compile(self.modelo_ia)
-                except: pass 
-            else:
-                self.modelo_ia = self.modelo_ia.float()
-            self.modelo_ia.eval()
-            return True
-        except: return False
-
-    def prever_fluidez(self, angulos):
-        if self.modelo_ia is None or not angulos: return 0.0
-        input_data = self.normalizar_sequencia(angulos)
-        with torch.no_grad():
-            is_cuda = self.device.type == 'cuda'
-            with autocast(enabled=is_cuda):
-                tensor = torch.tensor(input_data, dtype=torch.float32).to(self.device)
-                if is_cuda: tensor = tensor.half()
-                tensor = tensor.view(1, 100, 1)
-                output = self.modelo_ia(tensor)
-                return round(torch.sigmoid(output).item() * 100, 2)
-
-    def processar_video_para_memoria(self, video_path, progress_callback=None):
-        cap = cv2.VideoCapture(video_path)
-        frames, angulos, velocidades = [], [], []
-        total_f = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-        
-        self.angulo_suavizado = None
-        self.angulo_anterior = None
-        self.contador_reps = 0
-
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret: break
-
-            img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            res = self.pose.process(img_rgb)
-            val_ang, vel_ang = 0.0, 0.0
-
-            if res.pose_landmarks and res.pose_world_landmarks:
-                h, w, _ = img_rgb.shape
-                pts_3d, pts_2d = self._obter_pontos_clinicos(res.pose_landmarks.landmark, 
-                                                             res.pose_world_landmarks.landmark, w, h)
-                
-                # --- LÓGICA DE ROTEAMENTO ARTICULAR ---
-                if self.tipo_movimento == 'Flexão de Cotovelo':
-                    p_a, p_b, p_c = pts_3d['ombro'], pts_3d['cotovelo'], pts_3d['pulso']
-                    d_a, d_b, d_c = pts_2d['ombro'], pts_2d['cotovelo'], pts_2d['pulso']
-                    val_ang = self._calcular_angulo_clinico(p_a, p_b, p_c)
-                    
-                elif 'Ombro' in self.tipo_movimento:
-                    p_a, p_b, p_c = pts_3d['quadril'], pts_3d['ombro'], pts_3d['cotovelo']
-                    d_a, d_b, d_c = pts_2d['quadril'], pts_2d['ombro'], pts_2d['cotovelo']
-                    val_ang = self._calcular_angulo_clinico(p_a, p_b, p_c)
-
-                elif 'Punho' in self.tipo_movimento:
-                    # Uso do Centro da Palma para evitar que fechar a mão mude o ângulo
-                    p_a, p_b, p_c = pts_3d['cotovelo'], pts_3d['pulso'], pts_3d['centro_mao']
-                    d_a, d_b, d_c = pts_2d['cotovelo'], pts_2d['pulso'], pts_2d['centro_mao']
-                    val_ang = abs(180 - self._calcular_angulo_clinico(p_a, p_b, p_c))
-
-                # --- FILTRO EMA DE ESTABILIDADE ---
-                if self.angulo_suavizado is None:
-                    self.angulo_suavizado = val_ang
-                else:
-                    self.angulo_suavizado = (self.alpha * val_ang) + ((1 - self.alpha) * self.angulo_suavizado)
-                val_ang = self.angulo_suavizado
-
-                # Velocidade Angular Instantânea
-                if self.angulo_anterior is not None:
-                    vel_ang = abs(val_ang - self.angulo_anterior) * fps
-                self.angulo_anterior = val_ang
-
-                # Lógica de Repetições
-                th_flex = 30 if 'Punho' in self.tipo_movimento else 90
-                th_ext = 10 if 'Punho' in self.tipo_movimento else 140
-                if val_ang < th_flex and self.fase_movimento != "flexao": self.fase_movimento = "flexao"
-                elif val_ang > th_ext and self.fase_movimento == "flexao":
-                    self.fase_movimento = "extensao"; self.contador_reps += 1
-
-                # --- DESENHO TÉCNICO (PIBIC STANDARDS) ---
-                # Fundo para o texto
-                overlay = img_rgb.copy()
-                cv2.rectangle(overlay, (20, 20), (660, 70), (0, 0, 0), -1)
-                cv2.addWeighted(overlay, 0.6, img_rgb, 0.4, 0, img_rgb)
-                
-                cv2.line(img_rgb, d_a, d_b, (0, 255, 0), 4)
-                cv2.line(img_rgb, d_b, d_c, (0, 255, 0), 4)
-                cv2.circle(img_rgb, d_b, 8, (0, 0, 255), -1)
-                
-                hw = "GPU-ROCm" if self.device.type == "cuda" else "CPU"
-                status = f"MODO: {hw} | REPS: {self.contador_reps} | FASE: {self.fase_movimento.upper()}"
-                cv2.putText(img_rgb, status, (35, 53), cv2.FONT_HERSHEY_DUPLEX, 0.7, (255, 255, 255), 2)
-                cv2.putText(img_rgb, f"{int(val_ang)} deg", (d_b[0]-40, d_b[1]+45), cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 255, 255), 2)
-            
-            frames.append(img_rgb)
-            angulos.append(val_ang)
-            velocidades.append(vel_ang)
-            if progress_callback: progress_callback(min(len(frames) / total_f, 1.0))
-
-        cap.release()
-        return frames, angulos, velocidades, self.contador_reps, fps
-
-    def normalizar_sequencia(self, angulos, tamanho_alvo=100):
-        if len(angulos) < 2: return [0.0] * tamanho_alvo
-        return np.interp(np.linspace(0, 1, tamanho_alvo), np.linspace(0, 1, len(angulos)), angulos).tolist()
+                except: pass
