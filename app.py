@@ -1,12 +1,22 @@
+import os
+import gc
+
+# --- VACINA CONTRA O BUG DO STREAMLIT E MEDIAPIPE ---
+try:
+    import cv2
+except ImportError as e:
+    if "libGL" in str(e):
+        print("Instalando dependências headless...")
+        os.system("pip uninstall -y opencv-python opencv-contrib-python")
+        os.system("pip install opencv-python-headless opencv-contrib-python-headless")
+        import cv2
+
 import streamlit as st
 import tempfile
 import time
 import pandas as pd
 import numpy as np
 import torch
-import cv2
-import os
-import gc
 from src.core.engine import AnalisadorADMWeb
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -160,16 +170,20 @@ if st.session_state.analise_feita and st.session_state.frames_salvos:
             st.session_state.update({'frame_atual': min(total_frames - 1, st.session_state.frame_atual + frames_pulo), 'playing': False})
             st.rerun()
 
+        # --- PLAYER BLINDADO PARA A NUVEM ---
+        # Renderiza sempre a imagem atual primeiro
+        image_placeholder.image(st.session_state.frames_salvos[st.session_state.frame_atual], channels="RGB", use_column_width=True)
+
         if st.session_state.playing:
-            for i in range(st.session_state.frame_atual, total_frames):
-                if not st.session_state.playing: break
-                image_placeholder.image(st.session_state.frames_salvos[i], channels="RGB", use_column_width=True)
-                st.session_state.frame_atual = i
-                time.sleep(1/st.session_state.fps * 0.8) 
-            st.session_state.playing = False
-            st.rerun()
-        else:
-            image_placeholder.image(st.session_state.frames_salvos[st.session_state.frame_atual], channels="RGB", use_column_width=True)
+            if st.session_state.frame_atual < total_frames - 1:
+                # Avança 2 frames por vez para compensar o atraso da internet
+                st.session_state.frame_atual = min(st.session_state.frame_atual + 2, total_frames - 1)
+                time.sleep(0.02) # Respiro mínimo para o servidor
+                st.rerun()
+            else:
+                # Chegou no fim do vídeo
+                st.session_state.playing = False
+                st.rerun()
 
     with col_stats:
         st.subheader("📊 Relatório Clínico")
