@@ -1,4 +1,7 @@
 import sys
+import base64
+import json
+import streamlit.components.v1 as components
 import shutil
 try:
     import cv2
@@ -349,111 +352,197 @@ tab_player, tab_relatorio, tab_pibic = st.tabs(
 
 # ===== TAB PLAYER =====
 with tab_player:
-    col_vid, col_info = st.columns([2, 1], gap="large")
+    st.subheader(f"{movimento} — {lado}")
 
-    with col_vid:
-        st.subheader(f"{movimento} — {lado}")
+    # Codifica frames em base64 (faz UMA vez, fica em cache de sessão)
+    if 'frames_b64' not in st.session_state or \
+       len(st.session_state.get('frames_b64', [])) != total_frames:
 
-        # Controles de reprodução
-        c_play, c_vel, c_skip_l, c_skip_r = st.columns([2, 1, 1, 1])
+        with st.spinner("Preparando player..."):
+            frames_b64 = []
+            for f in frames:
+                # Converte BGR→RGB se necessário, depois para JPEG em memória
+                _, buf = cv2.imencode('.jpg', cv2.cvtColor(f, cv2.COLOR_RGB2BGR),
+                                      [cv2.IMWRITE_JPEG_QUALITY, 75])
+                frames_b64.append(base64.b64encode(buf).decode())
+            st.session_state['frames_b64'] = frames_b64
 
-        if c_play.button(
-            "⏸ Pausar" if st.session_state.playing else "▶️ Reproduzir",
-            use_container_width=True
-        ):
-            st.session_state.playing = not st.session_state.playing
-            st.rerun()
+    frames_b64 = st.session_state['frames_b64']
 
-        vel_play = c_vel.selectbox(
-            "Velocidade", [0.25, 0.5, 1.0, 1.5, 2.0],
-            index=2, format_func=lambda x: f"{x}×",
-            label_visibility="collapsed"
-        )
-        st.session_state.velocidade_play = vel_play
+    # Serializa ângulos e velocidades para JS
+    ang_json = json.dumps([round(a, 1) for a in angulos])
+    vel_json = json.dumps([round(v, 1) for v in velocidades])
 
-        frames_pulo = max(1, int(fps * 0.5))
-        if c_skip_l.button("⏪ −0.5s", use_container_width=True):
-            st.session_state.update({
-                'frame_atual': max(0, st.session_state.frame_atual - frames_pulo),
-                'playing': False,
-            })
-            st.rerun()
-        if c_skip_r.button("+0.5s ⏩", use_container_width=True):
-            st.session_state.update({
-                'frame_atual': min(total_frames - 1, st.session_state.frame_atual + frames_pulo),
-                'playing': False,
-            })
-            st.rerun()
+    player_html = f"""
+<style>
+  body {{ margin: 0; font-family: sans-serif; background: transparent; color: #222; }}
+  #wrap {{ display: flex; gap: 16px; align-items: flex-start; }}
+  #left  {{ flex: 2; min-width: 0; }}
+  #right {{ flex: 1; min-width: 200px; }}
+  #cvs   {{ width: 100%; border-radius: 10px; display: block; }}
 
-        # Slider de linha do tempo
-        idx = st.slider(
-            "Linha do tempo",
-            0, total_frames - 1,
-            st.session_state.frame_atual,
-            label_visibility="collapsed",
-        )
-        if idx != st.session_state.frame_atual:
-            st.session_state.update({'frame_atual': idx, 'playing': False})
-            st.rerun()
+  .ctrl  {{ display: flex; gap: 8px; align-items: center; margin: 10px 0 6px; flex-wrap: wrap; }}
+  button {{
+    padding: 6px 14px; border-radius: 7px; border: 1px solid #ccc;
+    background: #fff; cursor: pointer; font-size: 13px; font-weight: 600;
+    transition: background .15s;
+  }}
+  button:hover {{ background: #f0f0f0; }}
+  button.active {{ background: #1D9E75; color: #fff; border-color: #1D9E75; }}
 
-        # Frame atual
-        img_placeholder = st.empty()
-        img_placeholder.image(
-            frames[st.session_state.frame_atual],
-            channels="RGB",
-            use_column_width=True,
-        )
+  #timeline {{ width: 100%; margin: 4px 0; cursor: pointer; accent-color: #1D9E75; }}
+  #info     {{ font-size: 12px; color: #666; margin-bottom: 8px; }}
 
-        # Info do frame
-        t_atual = st.session_state.frame_atual / fps
-        st.caption(
-            f"⏱ {t_atual:.2f}s / {duracao:.2f}s  |  "
-            f"🎞 Frame {st.session_state.frame_atual}/{total_frames - 1}  |  "
-            f"📐 {angulos[st.session_state.frame_atual]:.1f}°  |  "
-            f"💨 {int(velocidades[st.session_state.frame_atual])}°/s  |  "
-            f"🚀 {'GPU' if modo_gpu else 'CPU'}"
-        )
+  .card {{
+    background: #fff; border: 1px solid #eee; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 10px;
+  }}
+  .label {{ font-size: 11px; color: #888; margin-bottom: 2px; }}
+  .value {{ font-size: 22px; font-weight: 600; color: #1D9E75; }}
 
-        # Loop do player
-        if st.session_state.playing:
-            if st.session_state.frame_atual < total_frames - 1:
-                pulo = max(1, int(vel_play * 2))
-                st.session_state.frame_atual = min(
-                    st.session_state.frame_atual + pulo, total_frames - 1
-                )
-                delay = max(0.01, 0.033 / vel_play)
-                time.sleep(delay)
-                st.rerun()
-            else:
-                st.session_state.update({'playing': False, 'frame_atual': 0})
-                st.rerun()
+  #miniChart {{ width: 100%; height: 120px; }}
+</style>
 
-    with col_info:
-        st.subheader("📊 Métricas ao Vivo")
+<div id="wrap">
+  <div id="left">
+    <canvas id="cvs"></canvas>
+    <div class="ctrl">
+      <button id="btnPlay" onclick="togglePlay()">&#9654; Play</button>
+      <button onclick="skip(-{max(1,int(fps*0.5))})">&#9664;&#9664; -0.5s</button>
+      <button onclick="skip({max(1,int(fps*0.5))})">+0.5s &#9654;&#9654;</button>
+      <select id="selVel" onchange="changeSpeed()" style="padding:5px 8px;border-radius:7px;border:1px solid #ccc;font-size:13px;">
+        <option value="0.25">0.25×</option>
+        <option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option>
+        <option value="1.5">1.5×</option>
+        <option value="2">2×</option>
+        <option value="4">4×</option>
+      </select>
+    </div>
+    <input type="range" id="timeline" min="0" max="{total_frames-1}" value="0"
+           oninput="seekTo(+this.value)" />
+    <div id="info">Frame 0 / {total_frames-1} &nbsp;|&nbsp; 0.00s / {duracao:.2f}s</div>
+    <canvas id="miniChart" width="600" height="120"></canvas>
+  </div>
 
-        ang_frame = angulos[st.session_state.frame_atual]
-        vel_frame = velocidades[st.session_state.frame_atual]
+  <div id="right">
+    <div class="card"><div class="label">Ângulo atual</div><div class="value" id="mAng">—</div></div>
+    <div class="card"><div class="label">Velocidade</div><div class="value" id="mVel" style="color:#BA7517">—</div></div>
+    <div class="card"><div class="label">ADM máxima</div><div class="value">{adm_max:.1f}°</div></div>
+    <div class="card"><div class="label">Repetições</div><div class="value">{st.session_state.total_reps}</div></div>
+  </div>
+</div>
 
-        m1, m2 = st.columns(2)
-        m1.metric("Ângulo", f"{ang_frame:.1f}°")
-        m2.metric("Velocidade", f"{int(vel_frame)}°/s")
-        m3, m4 = st.columns(2)
-        m3.metric("ADM máx.", f"{adm_max:.1f}°")
-        m4.metric("Reps", st.session_state.total_reps)
+<script>
+const FRAMES  = {json.dumps(frames_b64)};
+const ANGULOS = {ang_json};
+const VELS    = {vel_json};
+const FPS     = {fps:.2f};
 
-        st.markdown("**Curva de ângulo**")
-        chart_df = pd.DataFrame({
-            "Ângulo (°)": angulos,
-            "Frame": range(len(angulos)),
-        }).set_index("Frame")
-        st.line_chart(chart_df, height=180, color="#1D9E75")
+const cvs      = document.getElementById('cvs');
+const ctx      = cvs.getContext('2d');
+const timeline = document.getElementById('timeline');
+const info     = document.getElementById('info');
+const btnPlay  = document.getElementById('btnPlay');
 
-        # Indicadores de qualidade de sinal
-        st.markdown("**Qualidade do sinal**")
-        col_sig_a, col_sig_b = st.columns(2)
-        col_sig_a.metric("Outliers corrigidos", st.session_state.outliers_removidos)
-        consistencia = 100 - min(100, int(np.std(validos) / max(1, adm_max) * 100)) if validos else 0
-        col_sig_b.metric("Consistência", f"{consistencia}%")
+let idx = 0, playing = false, speed = 1.0, raf = null, lastTs = null;
+let accumMs = 0;
+const frameMs = () => 1000 / (FPS * speed);
+
+// Pré-carrega todas as imagens
+const imgs = FRAMES.map(b64 => {{
+  const im = new Image();
+  im.src = 'data:image/jpeg;base64,' + b64;
+  return im;
+}});
+
+function drawFrame(i) {{
+  const im = imgs[i];
+  if (!im.complete) {{ im.onload = () => drawFrame(i); return; }}
+  cvs.width  = im.naturalWidth  || cvs.offsetWidth;
+  cvs.height = im.naturalHeight || Math.round(cvs.width * 9/16);
+  ctx.drawImage(im, 0, 0, cvs.width, cvs.height);
+  drawChartCursor(i);
+  updateUI(i);
+}}
+
+function updateUI(i) {{
+  timeline.value  = i;
+  document.getElementById('mAng').textContent = ANGULOS[i].toFixed(1) + '°';
+  document.getElementById('mVel').textContent = Math.round(VELS[i]) + '°/s';
+  const t = i / FPS;
+  info.textContent = `Frame ${{i}} / {total_frames-1}  |  ${{t.toFixed(2)}}s / {duracao:.2f}s  |  ${{ANGULOS[i].toFixed(1)}}°  |  ${{Math.round(VELS[i])}}°/s`;
+}}
+
+function loop(ts) {{
+  if (!playing) return;
+  if (lastTs === null) lastTs = ts;
+  accumMs += ts - lastTs;
+  lastTs = ts;
+  const step = frameMs();
+  while (accumMs >= step) {{
+    idx = (idx + 1) % FRAMES.length;
+    accumMs -= step;
+  }}
+  drawFrame(idx);
+  raf = requestAnimationFrame(loop);
+}}
+
+function togglePlay() {{
+  playing = !playing;
+  btnPlay.textContent = playing ? '⏸ Pausar' : '▶ Play';
+  btnPlay.classList.toggle('active', playing);
+  if (playing) {{ lastTs = null; accumMs = 0; raf = requestAnimationFrame(loop); }}
+  else if (raf) cancelAnimationFrame(raf);
+}}
+
+function skip(n) {{
+  playing = false; btnPlay.textContent = '▶ Play'; btnPlay.classList.remove('active');
+  idx = Math.max(0, Math.min(FRAMES.length - 1, idx + n));
+  drawFrame(idx);
+}}
+
+function seekTo(i) {{
+  idx = i; lastTs = null; accumMs = 0;
+  drawFrame(idx);
+}}
+
+function changeSpeed() {{
+  speed = +document.getElementById('selVel').value;
+  lastTs = null; accumMs = 0;
+}}
+
+// Mini gráfico de ângulos
+const mc  = document.getElementById('miniChart');
+const mct = mc.getContext('2d');
+function drawMiniChart() {{
+  const W = mc.width, H = mc.height;
+  const maxA = Math.max(...ANGULOS, 1);
+  mct.clearRect(0,0,W,H);
+  mct.strokeStyle = '#1D9E75'; mct.lineWidth = 1.5;
+  mct.beginPath();
+  ANGULOS.forEach((a,i) => {{
+    const x = i / (ANGULOS.length-1) * W;
+    const y = H - (a / maxA) * (H - 8) - 4;
+    i === 0 ? mct.moveTo(x,y) : mct.lineTo(x,y);
+  }});
+  mct.stroke();
+}}
+
+function drawChartCursor(i) {{
+  const W = mc.width, H = mc.height;
+  drawMiniChart();
+  const x = i / (ANGULOS.length-1) * W;
+  mct.strokeStyle = '#BA7517'; mct.lineWidth = 1.5;
+  mct.beginPath(); mct.moveTo(x,0); mct.lineTo(x,H); mct.stroke();
+}}
+
+drawMiniChart();
+drawFrame(0);
+</script>
+"""
+
+    components.html(player_html, height=620, scrolling=False)
 
 
 # ===== TAB RELATÓRIO =====
