@@ -1,46 +1,31 @@
-import os
 import sys
-import subprocess
-
-# --- ESCUDO ANTI-LIBGL (Vacina Definitiva para a Nuvem) ---
-# 1. Cria uma rota de prioridade máxima para a pasta de usuário
-user_site = os.path.expanduser("~/.local/lib/python3.12/site-packages")
-if user_site not in sys.path:
-    sys.path.insert(0, user_site)
-
-# 2. Tenta carregar o OpenCV. Se o MediaPipe quebrou ele, nós consertamos na hora:
+import shutil
 try:
     import cv2
-except ImportError:
-    # Instala as bibliotecas corretas (Headless) na pasta destravada do usuário
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "opencv-python-headless", "opencv-contrib-python-headless", "--user", "--quiet"])
-    
-    # Arranca qualquer rastro do OpenCV quebrado da memória do Python
-    chaves_cv2 = [k for k in sys.modules if k.startswith("cv2")]
-    for k in chaves_cv2:
-        del sys.modules[k]
-        
-    import cv2 # Importa a versão blindada e correta
+except ImportError as e:
+    if "libGL" in str(e):
+      
+        site_packages_dir = next(p for p in sys.path if "site-packages" in p)
+        pasta_ruim = f"{site_packages_dir}/cv2"
+        if __import__("os").path.exists(pasta_ruim):
+            shutil.rmtree(pasta_ruim, ignore_errors=True)
+        if "cv2" in sys.modules:
+            del sys.modules["cv2"]
 
-# --- AGORA SIM, CARREGAMOS O RESTO DO APLICATIVO ---
 import streamlit as st
 import tempfile
 import time
 import pandas as pd
 import numpy as np
 import torch
+import cv2
+import os
 import gc
 from src.core.engine import AnalisadorADMWeb
 
-# ---------------------------------------------------------------------------
-# CONFIGURAÇÃO
-# ---------------------------------------------------------------------------
-st.set_page_config(
-    page_title="PhysioAI",
-    page_icon="🩺",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+# --- CONFIGURAÇÃO DA PÁGINA ---
+st.set_page_config(page_title="PhysioAI - Player Completo", page_icon="🩺", layout="wide")
+
 
 st.markdown("""
 <style>
