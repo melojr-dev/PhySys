@@ -1,10 +1,34 @@
+import os
+import sys
+import subprocess
+
+# --- ESCUDO ANTI-LIBGL (Vacina Definitiva para a Nuvem) ---
+# 1. Cria uma rota de prioridade máxima para a pasta de usuário
+user_site = os.path.expanduser("~/.local/lib/python3.12/site-packages")
+if user_site not in sys.path:
+    sys.path.insert(0, user_site)
+
+# 2. Tenta carregar o OpenCV. Se o MediaPipe quebrou ele, nós consertamos na hora:
+try:
+    import cv2
+except ImportError:
+    # Instala as bibliotecas corretas (Headless) na pasta destravada do usuário
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "opencv-python-headless", "opencv-contrib-python-headless", "--user", "--quiet"])
+    
+    # Arranca qualquer rastro do OpenCV quebrado da memória do Python
+    chaves_cv2 = [k for k in sys.modules if k.startswith("cv2")]
+    for k in chaves_cv2:
+        del sys.modules[k]
+        
+    import cv2 # Importa a versão blindada e correta
+
+# --- AGORA SIM, CARREGAMOS O RESTO DO APLICATIVO ---
 import streamlit as st
 import tempfile
 import time
 import pandas as pd
 import numpy as np
 import torch
-import os
 import gc
 from src.core.engine import AnalisadorADMWeb
 
