@@ -1,31 +1,12 @@
-import os
-import sys
-import gc
-
-# --- VACINA DEFINITIVA (Bypass de VENV do Streamlit) ---
-# Força o Python a ler a pasta onde a versão Headless foi instalada escondida
-user_site = os.path.expanduser("~/.local/lib/python3.12/site-packages")
-if os.path.exists(user_site) and user_site not in sys.path:
-    sys.path.insert(0, user_site)
-
-try:
-    import cv2
-except ImportError as e:
-    if "libGL" in str(e):
-        print("Instalando Headless na pasta local...")
-        os.system(f"{sys.executable} -m pip install opencv-python-headless opencv-contrib-python-headless")
-        if user_site not in sys.path:
-            sys.path.insert(0, user_site)
-        if "cv2" in sys.modules:
-            del sys.modules["cv2"] # Limpa o erro anterior da memória
-        import cv2
-
 import streamlit as st
 import tempfile
 import time
 import pandas as pd
 import numpy as np
 import torch
+import cv2
+import os
+import gc
 from src.core.engine import AnalisadorADMWeb
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -71,8 +52,10 @@ st.sidebar.title("⚙️ Configurações")
 # MONITOR DE HARDWARE (Consolidado)
 with st.sidebar.expander("🚀 Monitor de Hardware", expanded=True):
     if torch.cuda.is_available():
-        st.success(f"Frameskip: {torch.cuda.get_device_name(0)}")
-        st.caption("Aceleração quadros via software.")
+        st.success(f"GPU AMD Ativa: {torch.cuda.get_device_name(0)}")
+        st.caption("Aceleração RDNA 2 via ROCm ativa.")
+    else:
+        st.warning("IA rodando na CPU. Verifique o driver ROCm.")
 
 # PERFORMANCE TOGGLE
 st.sidebar.subheader("🚀 Performance")
