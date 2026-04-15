@@ -1,14 +1,23 @@
 import os
+import sys
 import gc
 
-# --- VACINA CONTRA O BUG DO STREAMLIT E MEDIAPIPE ---
+# --- VACINA DEFINITIVA (Bypass de VENV do Streamlit) ---
+# Força o Python a ler a pasta onde a versão Headless foi instalada escondida
+user_site = os.path.expanduser("~/.local/lib/python3.12/site-packages")
+if os.path.exists(user_site) and user_site not in sys.path:
+    sys.path.insert(0, user_site)
+
 try:
     import cv2
 except ImportError as e:
     if "libGL" in str(e):
-        print("Instalando dependências headless...")
-        os.system("pip uninstall -y opencv-python opencv-contrib-python")
-        os.system("pip install opencv-python-headless opencv-contrib-python-headless")
+        print("Instalando Headless na pasta local...")
+        os.system(f"{sys.executable} -m pip install opencv-python-headless opencv-contrib-python-headless")
+        if user_site not in sys.path:
+            sys.path.insert(0, user_site)
+        if "cv2" in sys.modules:
+            del sys.modules["cv2"] # Limpa o erro anterior da memória
         import cv2
 
 import streamlit as st
