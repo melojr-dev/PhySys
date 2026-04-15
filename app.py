@@ -71,10 +71,8 @@ st.sidebar.title("⚙️ Configurações")
 # MONITOR DE HARDWARE (Consolidado)
 with st.sidebar.expander("🚀 Monitor de Hardware", expanded=True):
     if torch.cuda.is_available():
-        st.success(f"GPU AMD Ativa: {torch.cuda.get_device_name(0)}")
-        st.caption("Aceleração RDNA 2 via ROCm ativa.")
-    else:
-        st.warning("IA rodando na CPU. Verifique o driver ROCm.")
+        st.success(f"Frameskip: {torch.cuda.get_device_name(0)}")
+        st.caption("Aceleração quadros via software.")
 
 # PERFORMANCE TOGGLE
 st.sidebar.subheader("🚀 Performance")
