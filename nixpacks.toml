@@ -1,2 +1,2 @@
 [phases.setup]
-nixPkgs = ["mesa", "glib"]
+nixPkgs = ["python311", "gcc", "mesa", "glib"]
