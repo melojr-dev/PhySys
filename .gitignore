@@ -1,7 +1,0 @@
-.venv/
-__pycache__/
-.vscode/
-*.mp4
-*.avi
-*.mov
-.env
