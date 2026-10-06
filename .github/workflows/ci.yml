@@ -1,0 +1,68 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r backend/requirements.lock
+      - run: PYTHONPATH=backend python -m unittest discover -s backend/tests -v
+      - run: python -m compileall -q backend scripts
+      - run: python scripts/release_manifest.py
+      - run: python scripts/verify_release.py
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
+
+  static-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/release_manifest.py
+      - run: python scripts/verify_phase23.py
+
+  compose-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure CI secrets
+        run: |
+          cat > .env <<'EOF'
+          PHYSIOAI_ADMIN_USER=admin
+          PHYSIOAI_ADMIN_PASSWORD=CI-only-PhysioAI-password-2026!
+          PHYSIOAI_AUTH_SECRET=CI-auth-secret-PhysioAI-0123456789abcdef
+          PHYSIOAI_PSEUDONYM_SECRET=CI-pseudo-secret-PhysioAI-fedcba9876543210
+          PHYSIOAI_BIND_ADDRESS=127.0.0.1
+          EOF
+      - run: docker compose config >/dev/null
+
+  e2e-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Full Docker E2E smoke
+        env:
+          PHYSIOAI_ADMIN_USER: admin
+          PHYSIOAI_ADMIN_PASSWORD: CI-only-PhysioAI-password-2026!
+          PHYSIOAI_AUTH_SECRET: CI-auth-secret-PhysioAI-0123456789abcdef
+          PHYSIOAI_PSEUDONYM_SECRET: CI-pseudo-secret-PhysioAI-fedcba9876543210
+          PHYSIOAI_BIND_ADDRESS: 127.0.0.1
+        run: ./scripts/e2e_stack.sh

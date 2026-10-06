@@ -1,0 +1,60 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+  packages: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate tag/version
+        run: test "v$(cat VERSION)" = "$GITHUB_REF_NAME"
+      - name: Backend regression
+        run: |
+          pip install -r backend/requirements.lock
+          PYTHONPATH=backend python -m unittest discover -s backend/tests -v
+      - name: Frontend build
+        working-directory: frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Clean generated frontend files
+        run: rm -rf frontend/node_modules frontend/dist frontend/tsconfig.tsbuildinfo
+      - name: Build and verify manifest
+        env:
+          PHYSIOAI_GIT_SHA: ${{ github.sha }}
+        run: |
+          python scripts/release_manifest.py
+          python scripts/verify_release.py
+          python scripts/doctor.py
+      - name: Package source release
+        run: |
+          tar \
+            --exclude=.git \
+            --exclude=.env \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='*.tsbuildinfo' \
+            --exclude='*.sqlite3' \
+            --exclude='*.sqlite3-*' \
+            -czf "physioai-${GITHUB_REF_NAME}.tar.gz" .
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            physioai-${{ github.ref_name }}.tar.gz
+            release/manifest.json

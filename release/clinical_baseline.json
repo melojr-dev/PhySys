@@ -1,0 +1,106 @@
+{
+  "baseline_id": "physioai-clinical-golden-1",
+  "cases": [
+    {
+      "expected_clinical_deg": 0.0,
+      "internal_angle_deg": 180.0,
+      "movement": "Flexão de Cotovelo"
+    },
+    {
+      "expected_clinical_deg": 90.0,
+      "internal_angle_deg": 90.0,
+      "movement": "Flexão de Cotovelo"
+    },
+    {
+      "expected_clinical_deg": 145.0,
+      "internal_angle_deg": 35.0,
+      "movement": "Flexão de Cotovelo"
+    },
+    {
+      "expected_clinical_deg": 0.0,
+      "internal_angle_deg": 180.0,
+      "movement": "Flexão de Joelho"
+    },
+    {
+      "expected_clinical_deg": 90.0,
+      "internal_angle_deg": 90.0,
+      "movement": "Flexão de Joelho"
+    },
+    {
+      "expected_clinical_deg": 135.0,
+      "internal_angle_deg": 45.0,
+      "movement": "Flexão de Joelho"
+    },
+    {
+      "expected_clinical_deg": 0.0,
+      "internal_angle_deg": 180.0,
+      "movement": "Flexão de Quadril"
+    },
+    {
+      "expected_clinical_deg": 90.0,
+      "internal_angle_deg": 90.0,
+      "movement": "Flexão de Quadril"
+    },
+    {
+      "expected_clinical_deg": 120.0,
+      "internal_angle_deg": 60.0,
+      "movement": "Flexão de Quadril"
+    },
+    {
+      "expected_clinical_deg": 0.0,
+      "internal_angle_deg": 100.0,
+      "movement": "Dorsiflexão de Tornozelo"
+    },
+    {
+      "expected_clinical_deg": 0.0,
+      "internal_angle_deg": 90.0,
+      "movement": "Dorsiflexão de Tornozelo"
+    },
+    {
+      "expected_clinical_deg": 10.0,
+      "internal_angle_deg": 80.0,
+      "movement": "Dorsiflexão de Tornozelo"
+    },
+    {
+      "expected_clinical_deg": 20.0,
+      "internal_angle_deg": 70.0,
+      "movement": "Dorsiflexão de Tornozelo"
+    },
+    {
+      "expected_clinical_deg": 0.0,
+      "internal_angle_deg": 0.0,
+      "movement": "Flexão de Ombro"
+    },
+    {
+      "expected_clinical_deg": 90.0,
+      "internal_angle_deg": 90.0,
+      "movement": "Flexão de Ombro"
+    },
+    {
+      "expected_clinical_deg": 180.0,
+      "internal_angle_deg": 180.0,
+      "movement": "Flexão de Ombro"
+    },
+    {
+      "expected_clinical_deg": 0.0,
+      "internal_angle_deg": 0.0,
+      "movement": "Abdução de Ombro"
+    },
+    {
+      "expected_clinical_deg": 90.0,
+      "internal_angle_deg": 90.0,
+      "movement": "Abdução de Ombro"
+    },
+    {
+      "expected_clinical_deg": 180.0,
+      "internal_angle_deg": 180.0,
+      "movement": "Abdução de Ombro"
+    }
+  ],
+  "claim": "Software regression fixture only; this baseline does not establish clinical validity or measurement accuracy.",
+  "protocol_contract_sha256": "677947b231e757b7018eb7ae64164190a225f999918dad7120b4fbadede5e8d5",
+  "protocol_version": "1.4",
+  "schema_version": "1",
+  "software_release": "2.18.0-rc.1",
+  "tolerance_deg": 1e-05
+}

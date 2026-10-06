@@ -1,0 +1,104 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: physioai_nginx
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "${PHYSIOAI_BIND_ADDRESS:-127.0.0.1}:${PHYSIOAI_HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${PHYSIOAI_VERSION:-2.22.0-rc.5}
+        GIT_SHA: ${PHYSIOAI_GIT_SHA:-unknown}
+        BUILD_TIME: ${PHYSIOAI_BUILD_TIME:-unknown}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PHYSIOAI_ENV: production
+      PHYSIOAI_DATA_DIR: /app/data
+      PHYSIOAI_VERSION: ${PHYSIOAI_VERSION:-2.22.0-rc.5}
+      PHYSIOAI_GIT_SHA: ${PHYSIOAI_GIT_SHA:-unknown}
+      PHYSIOAI_BUILD_TIME: ${PHYSIOAI_BUILD_TIME:-unknown}
+      PHYSIOAI_AUTH_SECRET: ${PHYSIOAI_AUTH_SECRET:?Defina PHYSIOAI_AUTH_SECRET no arquivo .env}
+      PHYSIOAI_ADMIN_USER: ${PHYSIOAI_ADMIN_USER:-admin}
+      PHYSIOAI_ADMIN_PASSWORD: ${PHYSIOAI_ADMIN_PASSWORD:?Defina PHYSIOAI_ADMIN_PASSWORD no arquivo .env}
+      PHYSIOAI_PSEUDONYM_SECRET: ${PHYSIOAI_PSEUDONYM_SECRET:?Defina PHYSIOAI_PSEUDONYM_SECRET no arquivo .env}
+      PHYSIOAI_TOKEN_TTL_SECONDS: ${PHYSIOAI_TOKEN_TTL_SECONDS:-28800}
+      PHYSIOAI_RESULT_TTL_SECONDS: ${PHYSIOAI_RESULT_TTL_SECONDS:-900}
+      PHYSIOAI_PREFLIGHT_TTL_SECONDS: ${PHYSIOAI_PREFLIGHT_TTL_SECONDS:-900}
+      PHYSIOAI_PREFLIGHT_MAX_SAMPLES: ${PHYSIOAI_PREFLIGHT_MAX_SAMPLES:-12}
+      PHYSIOAI_REQUIRE_PREFLIGHT: ${PHYSIOAI_REQUIRE_PREFLIGHT:-1}
+      PHYSIOAI_ALLOWED_ORIGINS: ${PHYSIOAI_ALLOWED_ORIGINS:-}
+      PHYSIOAI_MAX_INFLIGHT_JOBS: ${PHYSIOAI_MAX_INFLIGHT_JOBS:-3}
+      PHYSIOAI_MAX_UPLOAD_MB: ${PHYSIOAI_MAX_UPLOAD_MB:-256}
+      PHYSIOAI_MAX_TOTAL_UPLOAD_MB: ${PHYSIOAI_MAX_TOTAL_UPLOAD_MB:-512}
+      PHYSIOAI_WS_QUEUE_MAX: ${PHYSIOAI_WS_QUEUE_MAX:-512}
+      PHYSIOAI_ENABLE_EXPERIMENTAL_INPUTS: ${PHYSIOAI_ENABLE_EXPERIMENTAL_INPUTS:-0}
+      PHYSIOAI_MIN_FREE_DISK_MB: ${PHYSIOAI_MIN_FREE_DISK_MB:-512}
+      PHYSIOAI_DB_QUICKCHECK_INTERVAL_SECONDS: ${PHYSIOAI_DB_QUICKCHECK_INTERVAL_SECONDS:-300}
+      PHYSIOAI_LOG_FORMAT: ${PHYSIOAI_LOG_FORMAT:-json}
+      PHYSIOAI_LOG_LEVEL: ${PHYSIOAI_LOG_LEVEL:-INFO}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    stop_grace_period: 20s
+    init: true
+    volumes:
+      - physioai_data:/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${PHYSIOAI_VERSION:-2.22.0-rc.5}
+        GIT_SHA: ${PHYSIOAI_GIT_SHA:-unknown}
+        BUILD_TIME: ${PHYSIOAI_BUILD_TIME:-unknown}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8501/"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 10s
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Exposição pública é deliberadamente opt-in. Execute com:
+  # docker compose --profile public up --build
+  tunnel:
+    profiles: ["public"]
+    image: cloudflare/cloudflared:latest
+    container_name: physioai_tunnel
+    restart: unless-stopped
+    command: tunnel --url http://nginx:80
+    depends_on:
+      - nginx
+
+volumes:
+  physioai_data:

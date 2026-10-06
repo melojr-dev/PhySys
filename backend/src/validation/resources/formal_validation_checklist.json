@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "checklist_id": "physioai-formal-validation-readiness-1",
+  "required_before_run": [
+    "frozen_study_protocol",
+    "current_clinical_protocol_version",
+    "target_participants_defined",
+    "repetitions_per_participant_defined",
+    "reference_device_model_and_resolution",
+    "camera_setup_frozen",
+    "ethics_gate_satisfied_when_applicable",
+    "reference_device_calibration_current",
+    "statistical_analysis_plan_present",
+    "protocol_lock_present"
+  ],
+  "required_during_collection": [
+    "pseudonymized_participant_identifier_only",
+    "preflight_passed",
+    "server_authoritative_measurement",
+    "reference_reading_recorded_separately",
+    "exclusions_recorded_with_reason",
+    "audit_log_enabled"
+  ],
+  "required_after_collection": [
+    "formal_run_closed",
+    "study_report_exported",
+    "checksums_verified",
+    "raw_and_derived_bundle_archived_under_approved_retention_policy"
+  ]
+}
