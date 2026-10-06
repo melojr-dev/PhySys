@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "phase": 22,
+  "purpose": "Rastreabilidade técnica para revisão externa do pacote de comparação de métodos.",
+  "requirements": [
+    {
+      "id": "SCI-001",
+      "category": "scientific_integrity",
+      "requirement": "Métricas automáticas usadas na validação devem ser autoritativas do servidor.",
+      "implementation": ["backend/server.py", "backend/src/validation/study.py"],
+      "verification": ["backend/tests/test_validation_study_store.py", "backend/tests/test_research_provenance.py"],
+      "evidence": "Trials persist automatic_angle_deg from stored session telemetry rather than browser-supplied metrics."
+    },
+    {
+      "id": "SCI-002",
+      "category": "statistics",
+      "requirement": "Repetições do mesmo participante não devem ser apresentadas como participantes independentes.",
+      "implementation": ["backend/src/validation/study.py", "backend/src/validation/formal.py"],
+      "verification": ["backend/tests/test_formal_validation.py", "backend/tests/test_validation_study_store.py"],
+      "evidence": "Participant-balanced summaries and participant-cluster bootstrap are reported separately from trial-level metrics."
+    },
+    {
+      "id": "SCI-003",
+      "category": "agreement",
+      "requirement": "O relatório deve incluir erro absoluto, viés e concordância, não apenas correlação.",
+      "implementation": ["backend/src/validation/agreement.py"],
+      "verification": ["backend/tests/test_agreement.py"],
+      "evidence": "MAE, RMSE, bias, Bland-Altman limits, ICC(A,1), Lin CCC and Pearson r are exported."
+    },
+    {
+      "id": "GOV-001",
+      "category": "protocol_governance",
+      "requirement": "A execução formal deve congelar software, protocolo clínico e plano estatístico.",
+      "implementation": ["backend/src/validation/formal.py", "release/protocol_lock.json", "release/statistical_analysis_plan.json"],
+      "verification": ["backend/tests/test_formal_validation.py", "backend/tests/test_release_baseline.py"],
+      "evidence": "Formal run start snapshot stores immutable hashes for study protocol, statistical plan and protocol lock."
+    },
+    {
+      "id": "GOV-002",
+      "category": "software_regression",
+      "requirement": "Mudanças biomecânicas silenciosas devem falhar no release.",
+      "implementation": ["release/clinical_baseline.json", "release/protocol_lock.json", "scripts/verify_clinical_baseline.py"],
+      "verification": ["backend/tests/test_release_baseline.py"],
+      "evidence": "Golden baseline and protocol lock are checked in CI/release verification."
+    },
+    {
+      "id": "PRIV-001",
+      "category": "privacy",
+      "requirement": "O pacote externo não deve expor IDs internos, serial do instrumento ou notas livres.",
+      "implementation": ["backend/src/research/publication.py"],
+      "verification": ["backend/tests/test_publication_package.py"],
+      "evidence": "Reviewer bundle re-aliases participants/sessions and omits internal job/evaluator IDs, serials and free text."
+    },
+    {
+      "id": "REP-001",
+      "category": "reproducibility",
+      "requirement": "O pacote externo deve conter checksums e artefatos de governança suficientes para auditoria.",
+      "implementation": ["backend/src/research/publication.py"],
+      "verification": ["backend/tests/test_publication_package.py"],
+      "evidence": "Archive contains governance snapshots, analysis tables, SVG figures, traceability matrix and checksums.sha256."
+    },
+    {
+      "id": "SAFE-001",
+      "category": "interpretation",
+      "requirement": "Saídas experimentais e de validação não devem declarar diagnóstico ou eficácia clínica.",
+      "implementation": ["backend/src/research/publication.py", "backend/src/validation/formal.py"],
+      "verification": ["backend/tests/test_publication_package.py", "backend/tests/test_formal_validation.py"],
+      "evidence": "Export manifest and summaries state explicit interpretation boundaries."
+    }
+  ]
+}

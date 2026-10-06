@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "plan_id": "physioai-method-comparison-sap-1",
+  "clinical_protocol_version": "1.4",
+  "analysis_unit": "participant-clustered repeated trials",
+  "primary_endpoint": {
+    "name": "MAE_deg",
+    "description": "Mean absolute angular error between PhysioAI and the frozen physical reference in included protocol-compliant trials."
+  },
+  "secondary_endpoints": [
+    "bias_deg",
+    "RMSE_deg",
+    "ICC_A1_absolute_agreement",
+    "Lin_CCC",
+    "Bland_Altman_95pct_limits_of_agreement",
+    "participant_balanced_MAE",
+    "participant_cluster_bootstrap_95pct_CI"
+  ],
+  "exclusions": "Only exclusions frozen in the study protocol are applied automatically; manual exclusions require an explicit recorded reason.",
+  "independence_warning": "Frames and repeated trials from the same participant are not treated as independent participants.",
+  "missing_data": "No imputation of missing reference or invalid automatic measurements.",
+  "multiplicity": "Results are reported per movement/side; no diagnostic classification claim is produced.",
+  "claim_boundary": "Software method-comparison only. Passing this plan does not establish diagnostic validity or clinical effectiveness."
+}

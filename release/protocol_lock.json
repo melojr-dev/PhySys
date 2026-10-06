@@ -1,0 +1,9 @@
+{
+  "contract_sha256": "677947b231e757b7018eb7ae64164190a225f999918dad7120b4fbadede5e8d5",
+  "movement_specs_sha256": "4de9d2991c10b6ae4088a7120f73fb4b472dac24728dea30ea713bfa6f6637e8",
+  "policy": "Any semantic change to this contract requires an explicit protocol version bump or deliberate lock regeneration with documented rationale.",
+  "preflight_sha256": "701060fe2bb29f53678b16e496daa57bbb7996b295e8d3d038664e5a2b6f9450",
+  "protocol_version": "1.4",
+  "schema_version": "1",
+  "software_release": "2.18.0-rc.1"
+}
